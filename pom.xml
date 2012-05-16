@@ -56,6 +56,18 @@
     <url>http://github.com/nicoulaj/auto-instrument/issues</url>
   </issueManagement>
 
+  <ciManagement>
+    <system>Travis-CI</system>
+    <url>http://travis-ci.org/nicoulaj/auto-instrument</url>
+  </ciManagement>
+
+  <distributionManagement>
+    <site>
+      <id>github</id>
+      <url>gitsite:git@github.com/nicoulaj/auto-instrument.git</url>
+    </site>
+  </distributionManagement>
+
   <dependencies>
     <dependency>
       <groupId>org.testng</groupId>

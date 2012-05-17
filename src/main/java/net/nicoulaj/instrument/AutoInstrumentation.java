@@ -23,7 +23,6 @@ package net.nicoulaj.instrument;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.lang.instrument.Instrumentation;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
@@ -32,7 +31,9 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.jar.*;
+import java.util.jar.Attributes;
+import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 
 /**
  * Provides transparent access to the {@link Instrumentation} API, without explicitly starting the application with an agent,
@@ -65,7 +66,25 @@ public class AutoInstrumentation {
     synchronized public static Instrumentation getInstrumentation() {
         if (instrumentation == null) {
             try {
-                loadAsAgent();
+
+                // Generate agent jar
+                final File agentJarFile = generateAgentJar();
+
+                // Get current process id
+                final int pid = getPid();
+
+                // Load VirtualMachine class
+                final Class vmClass = getVirtualMachineClass();
+
+                // Attach to virtual machine
+                final Object vm = vmClass.getDeclaredMethod("attach", String.class).invoke(vmClass, String.valueOf(pid));
+
+                // Load agent
+                vmClass.getMethod("loadAgent", String.class).invoke(vm, agentJarFile.getPath());
+
+                // Detach
+                vmClass.getMethod("detach").invoke(vm);
+
             } catch (Exception e) {
                 throw new RuntimeException("Failed loading instrumentation", e);
             }
@@ -87,36 +106,45 @@ public class AutoInstrumentation {
     }
 
     /**
-     * Load this class as an agent in the current JVM.
+     * Generate an agent jar file in {@code java.io.tmpdir} with {@code MANIFEST} registering this class as an agent.
      * <p/>
      * This method is not meant to be used directly, see {@link #getInstrumentation()}.
      *
-     * @throws Exception if the agent could not be loaded
+     * @return the generated jar file object
+     * @throws Exception if the file could not be created or written to, or this class binary stream could not be read
      * @see #getInstrumentation()
      */
-    static void loadAsAgent() throws Exception {
+    static File generateAgentJar() throws Exception {
+        JarOutputStream jarOS = null;
         try {
-            // Load VirtualMachine class
-            final Class virtualMachineClass = getVirtualMachineClass();
+            // Prepare generated jar output file
+            final File jarFile = File.createTempFile(AutoInstrumentation.class.getSimpleName(), ".jar");
 
-            // Attach to virtual machine
-            final Object vm = virtualMachineClass.getDeclaredMethod("attach", String.class).invoke(virtualMachineClass, String.valueOf(getPid()));
+            // Prepare manifest
+            final Manifest manifest = new Manifest();
+            manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+            manifest.getMainAttributes().put(new Attributes.Name("Agent-Class"), AutoInstrumentation.class.getName());
+            manifest.getMainAttributes().put(new Attributes.Name("Can-Redefine-Classes"), Boolean.TRUE.toString());
+            manifest.getMainAttributes().put(new Attributes.Name("Can-Retransform-Classes"), Boolean.TRUE.toString());
+            manifest.getMainAttributes().put(new Attributes.Name("Can-Set-Native-Method-Prefix"), Boolean.TRUE.toString());
 
-            // Load agent
-            virtualMachineClass.getMethod("loadAgent", String.class).invoke(vm, getAgentJarPath());
+            // Prepare jar output stream
+            jarOS = new JarOutputStream(new FileOutputStream(jarFile), manifest);
 
-            // Detach
-            virtualMachineClass.getMethod("detach").invoke(vm);
+            // Return generated jar file
+            return jarFile;
 
         } catch (Throwable t) {
-            throw new Exception("Failed loading agent", t);
+            throw new Exception("Failed generating agent jar", t);
+        } finally {
+            if (jarOS != null) jarOS.close();
         }
     }
 
     /**
      * Get current process PID.
      * <p/>
-     * Tries two methods, the safest first.
+     * Tries two methods, the most portable first.
      * <p/>
      * This method is not meant to be used directly, see {@link #getInstrumentation()}.
      *
@@ -159,6 +187,8 @@ public class AutoInstrumentation {
 
     /**
      * Get current process PID from {@code VMManagement} instance.
+     * <p/>
+     * Only tested on HotSpot JVM.
      * <p/>
      * This method is not meant to be used directly, see {@link #getInstrumentation()}.
      *
@@ -246,108 +276,6 @@ public class AutoInstrumentation {
 
         } catch (Throwable t) {
             throw new Exception("Failed adding " + (isMac ? "classes.jar" : "tools.jar") + " to classpath", t);
-        }
-    }
-
-    /**
-     * Get the file system path of the jar containing the agent class.
-     * <p/>
-     * This method checks whether this class is packaged in a jar that fits requirements, in which case it is directly
-     * used. Otherwise, the jar is generated.
-     * <p/>
-     * This method is not meant to be used directly, see {@link #getInstrumentation()}.
-     *
-     * @return the path of the existing or generated jar file
-     * @throws Exception if the jar could not be generated
-     * @see #checkIsAgentJar(String)
-     * @see #generateAgentJar()
-     */
-    static String getAgentJarPath() throws Exception {
-        try {
-            final String codeSourcePath = AutoInstrumentation.class.getProtectionDomain().getCodeSource().getLocation().getPath();
-            try {
-                checkIsAgentJar(codeSourcePath);
-                return codeSourcePath;
-            } catch (Throwable t) {
-                return generateAgentJar();
-            }
-        } catch (Throwable t) {
-            throw new Exception("Failed resolving agent jar path", t);
-        }
-    }
-
-    /**
-     * Check whether the jar file at the given path is a valid agent jar, i.e:
-     * <ul>
-     * <li>Contains this class</li>
-     * <li>Declares this class as an agent in its manifest</li>
-     * </ul>
-     * <p/>
-     * This method is not meant to be used directly, see {@link #getInstrumentation()}.
-     *
-     * @param path the path to the jar file to check
-     * @throws Exception if one condition is not fulfilled
-     * @see #getAgentJarPath()
-     */
-    static void checkIsAgentJar(final String path) throws Exception {
-        final JarFile jarFile = new JarFile(path);
-
-        // Check manifest "Agent-Class" attribute presence
-        if (!jarFile.getManifest().getMainAttributes().containsKey(new Attributes.Name("Agent-Class")))
-            throw new Exception("The jar file has no \"Agent-Class\" attribute in its manifest");
-
-        // Check manifest "Agent-Class" attribute value
-        if (!jarFile.getManifest().getMainAttributes().get(new Attributes.Name("Agent-Class")).equals(AutoInstrumentation.class.getName()))
-            throw new Exception("The jar file has an invalid \"Agent-Class\" attribute in its manifest");
-
-        // Check agent class file presence
-        if (jarFile.getJarEntry(AutoInstrumentation.class.getName().replaceAll("\\.", "/") + ".class") == null)
-            throw new Exception("The jar file does not contain the " + AutoInstrumentation.class.getName() + " class");
-    }
-
-    /**
-     * Generate an agent jar file in {@code java.io.tmpdir}, containing this class and a proper {@code MANIFEST}.
-     * <p/>
-     * This method is not meant to be used directly, see {@link #getInstrumentation()}.
-     *
-     * @return the path of the generated jar file
-     * @throws Exception if the file could not be created or written to, or this class binary stream could not be read
-     * @see #getAgentJarPath()
-     */
-    static String generateAgentJar() throws Exception {
-        JarOutputStream jarOS = null;
-        InputStream agentClassIS = null;
-        try {
-            // Prepare generated jar output file
-            File jarFile = File.createTempFile(AutoInstrumentation.class.getSimpleName(), ".jar");
-
-            // Prepare manifest
-            final Manifest manifest = new Manifest();
-            manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-            manifest.getMainAttributes().put(new Attributes.Name("Agent-Class"), AutoInstrumentation.class.getName());
-            manifest.getMainAttributes().put(new Attributes.Name("Can-Redefine-Classes"), Boolean.TRUE.toString());
-            manifest.getMainAttributes().put(new Attributes.Name("Can-Retransform-Classes"), Boolean.TRUE.toString());
-            manifest.getMainAttributes().put(new Attributes.Name("Can-Set-Native-Method-Prefix"), Boolean.TRUE.toString());
-
-            // Prepare jar output stream
-            jarOS = new JarOutputStream(new FileOutputStream(jarFile), manifest);
-
-            // Add this class to the jar
-            final String agentClassPath = AutoInstrumentation.class.getName().replace('.', '/') + ".class";
-            agentClassIS = AutoInstrumentation.class.getClassLoader().getResourceAsStream(agentClassPath);
-            jarOS.putNextEntry(new JarEntry(agentClassPath));
-            byte buffer[] = new byte[1024];
-            int c;
-            while ((c = agentClassIS.read(buffer, 0, buffer.length)) > 0) jarOS.write(buffer, 0, c);
-
-            // Return generated jar file
-            return jarFile.getPath();
-
-        } catch (Throwable t) {
-            throw new Exception("Failed generating agent jar", t);
-        } finally {
-            if (jarOS != null) jarOS.close();
-            if (agentClassIS != null) agentClassIS.close();
         }
     }
 }

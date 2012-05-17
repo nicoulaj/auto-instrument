@@ -25,8 +25,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.lang.instrument.Instrumentation;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 
@@ -66,11 +64,10 @@ public class AutoInstrumentationTest {
 
     @Test(groups = "generateAgentJar")
     public void testGenerateAgentJar() throws Exception {
-        final File agentJarFile = new File(generateAgentJar());
+        final File agentJarFile = generateAgentJar();
         assertNotNull(agentJarFile, "agent jar file is null");
         assertTrue(agentJarFile.exists(), "agent jar file does not exist");
         assertTrue(agentJarFile.isFile(), "agent jar is not a file");
-        assertTrue(new URLClassLoader(new URL[]{agentJarFile.toURI().toURL()}).loadClass(AutoInstrumentation.class.getName()) != null, AutoInstrumentation.class.getName() + " class cannot be loaded");
         final JarFile jarFile = new JarFile(agentJarFile);
         assertNotNull(jarFile.getManifest().getMainAttributes().get(new Attributes.Name("Agent-Class")), "manifest has no Agent-Class attribute");
         assertTrue(jarFile.getManifest().getMainAttributes().get(new Attributes.Name("Agent-Class")).equals(AutoInstrumentation.class.getName()), "manifest Agent-Class attribute value is invalid");
@@ -82,27 +79,7 @@ public class AutoInstrumentationTest {
         assertTrue(jarFile.getManifest().getMainAttributes().get(new Attributes.Name("Can-Set-Native-Method-Prefix")).equals(Boolean.TRUE.toString()), "manifest Can-Set-Native-Method-Prefix attribute value is invalid");
     }
 
-    @Test(groups = "checkIsAgentJar", expectedExceptions = Exception.class)
-    public void testCheckIsAgentJarNullPath() throws Exception {
-        checkIsAgentJar(null);
-    }
-
-    @Test(groups = "checkIsAgentJar", expectedExceptions = Exception.class)
-    public void testCheckIsAgentJarInvalidPath() throws Exception {
-        checkIsAgentJar(AutoInstrumentationTest.class.getName());
-    }
-
-    @Test(dependsOnGroups = {"checkIsAgentJar", "generateAgentJar"})
-    public void testGenerateAgentJarIsAgentJar() throws Exception {
-        checkIsAgentJar(generateAgentJar());
-    }
-
-    @Test(dependsOnGroups = {"checkIsAgentJar", "generateAgentJar"})
-    public void testGetAgentJarPathIsAgentJar() throws Exception {
-        checkIsAgentJar(generateAgentJar());
-    }
-
-    @Test(dependsOnGroups = {"getPid", "checkIsAgentJar", "generateAgentJar"}, invocationCount = 2)
+    @Test(dependsOnGroups = {"getPid", "generateAgentJar"}, invocationCount = 2)
     public void testGetInstrumentation() throws Exception {
         final Instrumentation instrumentation = getInstrumentation();
         assertNotNull(instrumentation, "getInstrumentation() returns null value");

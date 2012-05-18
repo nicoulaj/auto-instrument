@@ -1,4 +1,4 @@
-auto-instrument [![Build Status](https://secure.travis-ci.org/nicoulaj/auto-instrument.png)](http://travis-ci.org/nicoulaj/auto-instrument)
+auto-instrument [![Build Status](https://buildhive.cloudbees.com/job/nicoulaj/job/auto-instrument/badge/icon)](https://buildhive.cloudbees.com/job/nicoulaj/job/auto-instrument/)
 ===============
 
 **Use [`java.lang.instrument`](http://docs.oracle.com/javase/6/docs/api/java/lang/instrument/package-summary.html) without writing an agent.**

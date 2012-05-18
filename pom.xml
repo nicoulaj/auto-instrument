@@ -57,7 +57,7 @@
   </issueManagement>
 
   <ciManagement>
-    <system>Travis-CI</system>
+    <system>Cloudbees BuildHive</system>
     <url>http://travis-ci.org/nicoulaj/auto-instrument</url>
   </ciManagement>
 

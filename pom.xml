@@ -88,28 +88,14 @@
             <artifactId>doxia-module-markdown</artifactId>
             <version>${doxia-module-markdown.version}</version>
           </dependency>
+          <dependency>
+            <groupId>org.kohsuke</groupId>
+            <artifactId>wagon-gitsite</artifactId>
+            <version>${wagon-gitsite.version}</version>
+          </dependency>
         </dependencies>
       </plugin>
     </plugins>
-
-    <extensions>
-      <extension>
-        <groupId>org.apache.maven.scm</groupId>
-        <artifactId>maven-scm-provider-gitexe</artifactId>
-        <version>${maven-scm-provider-gitexe.version}</version>
-      </extension>
-      <extension>
-        <groupId>org.apache.maven.scm</groupId>
-        <artifactId>maven-scm-manager-plexus</artifactId>
-        <version>${maven-scm-manager-plexus.version}</version>
-      </extension>
-      <extension>
-        <groupId>org.kathrynhuxtable.maven.wagon</groupId>
-        <artifactId>wagon-gitsite</artifactId>
-        <version>${wagon-gitsite.version}</version>
-      </extension>
-    </extensions>
-
   </build>
 
   <reporting>

@@ -31,7 +31,7 @@
 
   <groupId>net.ju-n.auto-instrument</groupId>
   <artifactId>auto-instrument</artifactId>
-  <version>1.0.2-SNAPSHOT</version>
+  <version>1.0.2</version>
 
   <name>auto-instrument</name>
   <inceptionYear>2012</inceptionYear>
@@ -49,7 +49,7 @@
     <url>http://github.com/nicoulaj/auto-instrument</url>
     <connection>scm:git:git@github.com:nicoulaj/auto-instrument.git</connection>
     <developerConnection>scm:git:git@github.com:nicoulaj/auto-instrument.git</developerConnection>
-    <tag>HEAD</tag>
+    <tag>1.0.2</tag>
   </scm>
 
   <issueManagement>
